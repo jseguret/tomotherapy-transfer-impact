@@ -126,43 +126,39 @@ Get the percentage of dose error when a plan is transfered from a machine to ano
 --------------------------------------------------------------------------------------------------"""
 def get_error_shift(sinogram,delivery):
 
-    PT = delivery["PT"]
+    PT = delivery["PT"] 
     LOT_sino = PT*sinogram
     maxLOT = np.max(LOT_sino)
     total_lot = np.sum(LOT_sino)
-    open_leaves_LOT = LOT_sino[np.nonzero(LOT_sino)]
+    open_leaves_LOT = LOT_sino[np.nonzero(LOT_sino)]  #size of open leaves corresponds to N_open (see publication)
     
-    thresh = 18
+    thresh = 18 #max leaf transitionj time is taken as 18 ms accuray
     undisc_LCT = 0
     
-    cond1 = LOT_sino<(maxLOT-1)  
-    cond2 = LOT_sino>(PT-thresh)
+    cond1 = LOT_sino<(maxLOT-1)  #exclude LOT = PT
+    cond2 = LOT_sino>(PT-thresh) #LOT is a short LCT 
     row,col = np.where(cond1 & cond2)
     
     for i in range(len(row)):
         
-        if (row[i] > 0) & (row[i] < LOT_sino.shape[0]):           
+        if row[i] < LOT_sino.shape[0]:           
             if (LOT_sino[row[i]+1,col[i]] > (PT-20)):
                 undisc_LCT = undisc_LCT+1 
                 #iterate if current LOT is in the range PT-18ms AND next or previous LOT (for a given leaf) is in the range PT-20ms
                 #use of PT-20 ms because mean latency offset of our machines is 2ms
-        
-        elif row[i] == 0 :
-            if LOT_sino[row[i]+1,col[i]] > (PT-20):
-                undisc_LCT = undisc_LCT+1 
                 
         else : 
             row[i] = -1 
             col[i] = -1 
             
-    filtered_row = row[row>(-0.5)]
+    filtered_row = row[row>(-0.5)] #only get the sinograms entries corresponding to short LCT
     filtered_col = col[col>(-0.5)]
     extra_time = 0  
     
     for i in range(len(filtered_row)-1):
-        extra_time = extra_time + (PT - LOT_sino[filtered_row[i],filtered_col[i]])
+        extra_time = extra_time + (PT - LOT_sino[filtered_row[i],filtered_col[i]])  # add additional time to get the sum of it
 
-    return ((extra_time/total_lot)*100), ((undisc_LCT/(len(open_leaves_LOT)))*100)
+    return ((extra_time/total_lot)*100), ((undisc_LCT/(len(open_leaves_LOT)))*100) # return the percentage of this extra time compared to sum of all LOTs
             
 
 """--------------------------------------------------------------------------------------------------
@@ -206,6 +202,10 @@ def calc_error_all():
     return errors_all
 
 
+
+"""--------------------------------------------------------------------------------------------------
+Create scrollable table with tkinter to plot the supplemantary dose estimations 
+--------------------------------------------------------------------------------------------------"""
 def create_gui(root, data, columns):
     tree = ttk.Treeview(root, columns=columns, show='headings')
     
@@ -236,7 +236,9 @@ def create_gui(root, data, columns):
 
     return tree
 
-
+"""--------------------------------------------------------------------------------------------------
+Function that stops the tkinter interactive window job when closing the window 
+--------------------------------------------------------------------------------------------------"""
 def on_closing():
     root.destroy()
     sys.exit()
@@ -296,6 +298,9 @@ root.grid_columnconfigure(0, weight=1)
 
 fig = create_gui(root, plot_lines, plot_cols)
 
+
+
+""" xlsx file writing with openpyxl"""
 wb = openpyxl.Workbook()
 ws = wb.active
 ws.title = "Supplementary dose results" 
